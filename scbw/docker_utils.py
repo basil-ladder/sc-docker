@@ -162,7 +162,7 @@ def launch_image(
         map_name: str,
         game_type: GameType,
         game_speed: int,
-        seed_override: int,
+        seed_override: str,
         timeout: Optional[int],
         timeout_at_frame: Optional[int],
         hide_names: bool,
