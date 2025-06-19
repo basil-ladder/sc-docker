@@ -16,4 +16,5 @@ def check_vnc_exists() -> None:
 
 def launch_vnc_viewer(host: str, port: int) -> None:
     vnc_path = find_vnc_executable()
+    # launch in bg
     os.spawnl(os.P_NOWAIT, vnc_path, os.path.basename(vnc_path), f"{host}:{port}")
