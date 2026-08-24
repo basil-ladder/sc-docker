@@ -1,5 +1,9 @@
-FROM starcraft:wine
+ARG BASE_IMAGE=starcraft:wine
+FROM ${BASE_IMAGE}
 LABEL maintainer="Michal Sustr <michal.sustr@aic.fel.cvut.cz>"
+
+ARG NVCUDA_RELAY_URL=https://github.com/SveSop/nvcuda/releases/download/v0.2/nvcuda-0.2.tar.xz
+ARG NVCUDA_RELAY_SHA256=38003fc9f045474fa9e19b9e4f6232fafa7041499c48563e82e538c74d385326
 
 ENV SC_DIR="$APP_DIR/sc"
 ENV BWTA_DIR="$APP_DIR/bwta"
@@ -51,8 +55,28 @@ WORKDIR $APP_DIR
 # Create SC dir
 RUN mkdir "${SC_DIR}"
 
-# Copy dll files
-COPY --chown=starcraft:users dlls/* $WINEPREFIX/drive_c/windows/system32/
+# A 64-bit Wine prefix runs 32-bit StarCraft through WoW64. Keep PE32 DLLs
+# in syswow64 and PE32+ DLLs in system32; win32 prefixes retain the legacy
+# system32 layout.
+COPY --chown=starcraft:users dlls/ /tmp/sc-docker-dlls/
+RUN set -eux; \
+    if [ "$WINEARCH" = "win64" ]; then \
+      for dll in /tmp/sc-docker-dlls/*.dll; do \
+        if winedump dump "$dll" | grep -q 'Optional Header (64bit)'; then \
+          cp "$dll" "$WINEPREFIX/drive_c/windows/system32/"; \
+        else \
+          cp "$dll" "$WINEPREFIX/drive_c/windows/syswow64/"; \
+        fi; \
+      done; \
+      wget -q -O /tmp/nvcuda-relay.tar.xz "$NVCUDA_RELAY_URL"; \
+      echo "$NVCUDA_RELAY_SHA256  /tmp/nvcuda-relay.tar.xz" | sha256sum -c -; \
+      tar -xf /tmp/nvcuda-relay.tar.xz -C /tmp; \
+      cp /tmp/nvcuda-0.2/x64/nvcuda.dll "$WINEPREFIX/drive_c/windows/system32/"; \
+      rm -rf /tmp/nvcuda-0.2 /tmp/nvcuda-relay.tar.xz; \
+    else \
+      cp /tmp/sc-docker-dlls/*.dll "$WINEPREFIX/drive_c/windows/system32/"; \
+    fi; \
+    rm -rf /tmp/sc-docker-dlls
 
 # Install more dlls from winetricks. It requires X-server so let's run in bg for now :)
 RUN /bin/bash -c "Xvfb :0 -auth ~/.Xauthority -screen 0 640x480x24 & winetricks -q vcrun2015"

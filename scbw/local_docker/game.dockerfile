@@ -1,4 +1,5 @@
-FROM starcraft:java
+ARG BASE_IMAGE=starcraft:java
+FROM ${BASE_IMAGE}
 LABEL maintainer="Michal Sustr <michal.sustr@aic.fel.cvut.cz>"
 
 #####################################################################

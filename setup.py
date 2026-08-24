@@ -47,7 +47,7 @@ setup(
                       'python-dateutil',
                       'pandas',
                       'matplotlib',
-                      'docker'],
+                      'docker>=4.3.0'],
     packages=['scbw'],
     entry_points={  # Optional
         'console_scripts': [

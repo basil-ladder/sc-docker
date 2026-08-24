@@ -20,4 +20,5 @@ SC_BOT_DIR = f"{SCBW_BASE_DIR}/bots"
 SC_MAP_DIR = f"{SCBW_BASE_DIR}/maps"
 
 SC_IMAGE = "starcraft:game"
+SC_IMAGE_WOW64 = "starcraft:game-wow64"
 SC_JAVA_IMAGE = "starcraft:java"

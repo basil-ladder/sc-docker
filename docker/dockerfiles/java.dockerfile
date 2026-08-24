@@ -1,4 +1,5 @@
-FROM starcraft:play
+ARG BASE_IMAGE=starcraft:play
+FROM ${BASE_IMAGE}
 LABEL maintainer="Michal Sustr <michal.sustr@aic.fel.cvut.cz>"
 
 

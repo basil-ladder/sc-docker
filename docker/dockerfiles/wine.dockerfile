@@ -8,8 +8,6 @@ ENV LOG_DIR $APP_DIR/logs
 ENV WINEDLLOVERRIDES="mscoree,mshtml="
 # Wine path
 ENV WINEPREFIX /home/starcraft/.wine
-# Make sure to run 32bit windows
-ENV WINEARCH win32
 # X display
 ENV DISPLAY :0.0
 # Make possible to use custom title bars
@@ -56,7 +54,7 @@ RUN set -x \
   && wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
   && wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources \
   && apt-get update -y \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb xauth x11vnc winehq-stable unzip cabextract \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb xauth x11vnc winehq-stable unzip cabextract xz-utils \
   && wget https://github.com/Winetricks/winetricks/raw/master/src/winetricks \
   && chmod +x winetricks \
   && mv -v winetricks /usr/local/bin \
@@ -69,8 +67,14 @@ RUN mkdir $APP_DIR && chown starcraft:users $APP_DIR
 WORKDIR $APP_DIR
 
 #####################################################################
+ARG WINE_ARCH=win32
+# Existing images remain win32 unless an image build explicitly opts into WoW64.
+ENV WINEARCH=$WINE_ARCH
+
 # Wine shouldn't be run as root, so let's use a 'starcraft' user
 USER starcraft
+
+RUN case "$WINEARCH" in win32|win64) ;; *) echo "Unsupported WINE_ARCH: $WINEARCH" >&2; exit 2 ;; esac
 
 RUN mkdir -m 700 $LOG_DIR
 VOLUME $LOG_DIR

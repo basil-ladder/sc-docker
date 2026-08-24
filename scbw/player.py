@@ -68,6 +68,9 @@ class BotJsonMeta:
     javaDebugPort: Optional[int] = None  # optionally allow attaching debugger
     javaOpts: Optional[str] = None # optional parameters to JVM
     port : Optional[str] = None # optionally publish a custom port to the host
+    wineArchitecture: str = "win32"
+    requiresCuda: bool = False
+    startupGraceFrames: int = 0
 
 
 class BotPlayer(Player):
@@ -170,6 +173,28 @@ class BotPlayer(Player):
         meta.javaDebugPort = json_spec['javaDebugPort'] if 'javaDebugPort' in json_spec else None
         meta.javaOpts = json_spec['javaOpts'] if 'javaOpts' in json_spec else None
         meta.port = json_spec['port'] if 'port' in json_spec else None
+
+        meta.wineArchitecture = json_spec.get('wineArchitecture', 'win32')
+        if meta.wineArchitecture not in ('win32', 'win64'):
+            raise PlayerException(
+                "wineArchitecture must be either 'win32' or 'win64'"
+            )
+
+        meta.requiresCuda = json_spec.get('requiresCuda', False)
+        if not isinstance(meta.requiresCuda, bool):
+            raise PlayerException("requiresCuda must be a boolean")
+        if meta.requiresCuda and meta.wineArchitecture != 'win64':
+            raise PlayerException(
+                "requiresCuda bots must set wineArchitecture to 'win64'"
+            )
+
+        meta.startupGraceFrames = json_spec.get('startupGraceFrames', 0)
+        if (isinstance(meta.startupGraceFrames, bool)
+                or not isinstance(meta.startupGraceFrames, int)
+                or meta.startupGraceFrames < 0):
+            raise PlayerException(
+                "startupGraceFrames must be a non-negative integer"
+            )
 
         return meta
 

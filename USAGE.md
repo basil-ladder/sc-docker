@@ -103,6 +103,44 @@ Use this structure:
 
     `botType` can be one of {`JAVA_JNI`, `JAVA_MIRROR`, `AI_MODULE`, `EXE`, `JYTHON`}
 
+    Existing bot configurations continue to use the original 32-bit image and
+    receive no GPU access. Bots can opt into additional runtime capabilities:
+
+    - `wineArchitecture` can be `win32` (the default) or `win64`. A `win64` bot
+      runs in the separate `starcraft:game-wow64` image. The image still runs
+      32-bit StarCraft and BWAPI through Wine's WoW64 support while allowing the
+      bot to launch 64-bit Windows processes.
+
+    - `requiresCuda` is a boolean and defaults to `false`. When `true`, Docker
+      exposes all available GPUs to that bot's container. CUDA bots must also
+      set `wineArchitecture` to `win64`. The host must already be configured so
+      Docker containers can access its NVIDIA GPU.
+
+    - `startupGraceFrames` is a non-negative integer and defaults to `0`. It
+      raises the tournament module's no-command startup allowance for the game.
+      Use this for bots that must load a large model before issuing their first
+      command.
+
+    A 64-bit CPU bot can opt in with:
+
+        {
+          "name": "64-BIT BOT",
+          "race": "Terran",
+          "botType": "EXE",
+          "wineArchitecture": "win64"
+        }
+
+    A CUDA bot that needs additional model-loading time can use:
+
+        {
+          "name": "CUDA BOT",
+          "race": "Random",
+          "botType": "AI_MODULE",
+          "wineArchitecture": "win64",
+          "requiresCuda": true,
+          "startupGraceFrames": 86400
+        }
+
 - **/BWAPI.dll** - your own version of BWAPI.dll. Must be in the list of supported BWAPIs, see file `bwapi.py`. You can quickly check if `$ md5sum BWAPI.dll` is some of these:
 
       4.2.0   2f6fb401c0dcf65925ee7ad34dc6414a
@@ -121,7 +159,8 @@ Now you should be able to play game:
 
 ### Developing sc-docker
 
-If you update images, you can rebuild them locally:
+If you update images, you can rebuild them locally. The build creates both the
+existing `starcraft:game` image and the opt-in `starcraft:game-wow64` image:
 
     $ cd docker; ./build_images.sh
 

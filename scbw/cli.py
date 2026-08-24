@@ -6,7 +6,7 @@ import sys
 import coloredlogs
 import docker
 from scbw.defaults import (
-    SC_BOT_DIR, SC_GAME_DIR, SC_MAP_DIR, SCBW_BASE_DIR, SC_IMAGE,
+    SC_BOT_DIR, SC_GAME_DIR, SC_MAP_DIR, SCBW_BASE_DIR, SC_IMAGE, SC_IMAGE_WOW64,
     SC_BWAPI_DATA_BWTA_DIR, SC_BWAPI_DATA_BWTA2_DIR, VERSION
 )
 from scbw.docker_utils import BASE_VNC_PORT, VNC_HOST
@@ -128,6 +128,9 @@ parser.add_argument('--docker_image', type=str, default=SC_IMAGE,
                     help="The name of the image that should \n"
                          "be used to launch the game.\n"
                          "This helps with local development.")
+parser.add_argument('--docker_image_wow64', type=str, default=SC_IMAGE_WOW64,
+                    help="The image used only for bots whose bot.json sets\n"
+                         "wineArchitecture to win64.")
 parser.add_argument('--plot_realtime', action='store_true',
                     help="Allow realtime plotting of frame information.\n"
                          "At the end of the game, this plot will be saved\n"
