@@ -154,6 +154,18 @@ def _image_version_up_to_date():
 # We need to think about how to setup docker IPs,
 # maybe we will need to specify manually routing tables? :/
 
+def missing_data_directories(args):
+    configured = {
+        "bot": args.bot_dir,
+        "game": args.game_dir,
+        "map": args.map_dir,
+        "BWTA": args.bwapi_data_bwta_dir,
+        "BWTA2": args.bwapi_data_bwta2_dir,
+    }
+    return [f"{name}: {path}" for name, path in configured.items()
+            if not os.path.exists(path)]
+
+
 def main():
     args = parser.parse_args()
     if args.show_version:
@@ -177,9 +189,13 @@ def main():
         except KeyboardInterrupt:
             sys.exit(1)
 
-    if not os.path.exists(SCBW_BASE_DIR):
-        parser.error(f'The data directory {SCBW_BASE_DIR} was not found. '
-                     f'Did you run "scbw.play --install"?')
+    missing_directories = missing_data_directories(args)
+    if missing_directories:
+        parser.error(
+            "The configured data directories were not found:\n"
+            + "\n".join(missing_directories)
+            + '\nDid you run "scbw.play --install" or pass explicit data directories?'
+        )
         # parser.error exits
 
     # bots are always required, but not if showing version :)
