@@ -121,6 +121,16 @@ Use this structure:
       Use this for bots that must load a large model before issuing their first
       command.
 
+    - `cpuLimit` is an optional finite positive number of Docker CPU-equivalents
+      for this player's entire container. Omitted or null values use the
+      `--nano_cpus` command-line fallback. For example, `"cpuLimit": 2.0`
+      allows two CPU-equivalents while retaining the package's existing Wine
+      and CUDA choices. `--player_nano_cpus` supplies one explicit non-negative
+      integer per player, in launch order, overriding metadata for reproducible
+      tournament snapshots; zero means uncapped. Invalid values or a mismatched
+      player count are rejected before containers start. The tournament runner
+      remains responsible for limiting the sum across concurrent games.
+
     A 64-bit CPU bot can opt in with:
 
         {

@@ -85,6 +85,19 @@ def startup_grace_frames(players: List[Player]) -> int:
     ] + [0])
 
 
+def player_nano_cpu_limits(players: List[Player], fallback: Optional[int],
+                           explicit: Optional[List[int]] = None) -> List[int]:
+    if explicit is not None:
+        if len(explicit) != len(players) or any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in explicit):
+            raise GameException("player_nano_cpus requires one non-negative integer per player")
+        return list(explicit)
+    return [round(player.meta.cpuLimit * 1_000_000_000)
+            if isinstance(player, BotPlayer) and player.meta.cpuLimit is not None
+            else (fallback or 0) for player in players]
+
+
 def ensure_docker_can_run() -> None:
     """
     :raises docker.errors.ContainerError
@@ -413,8 +426,13 @@ def launch_game(
         logger.info(f"removing existing game results of {game_name}")
         shutil.rmtree(f"{game_dir}/{game_name}")
 
+    image_params = dict(launch_params)
+    limits = image_params.pop("player_nano_cpus", None)
+    limits = player_nano_cpu_limits(players, image_params.get("nano_cpus"), limits)
     for nth_player, player in enumerate(players):
-        launch_image(player, nth_player=nth_player, num_players=len(players), **launch_params)
+        image_params["nano_cpus"] = limits[nth_player]
+        logger.info(f"CPU limit for {player}: {limits[nth_player]} nano-CPUs")
+        launch_image(player, nth_player=nth_player, num_players=len(players), **image_params)
 
     logger.debug("checking if game has launched properly...")
     time.sleep(1)

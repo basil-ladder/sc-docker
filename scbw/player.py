@@ -5,6 +5,7 @@ import enum
 import glob
 import json
 import logging
+import math
 import os.path
 import re
 
@@ -71,6 +72,7 @@ class BotJsonMeta:
     wineArchitecture: str = "win32"
     requiresCuda: bool = False
     startupGraceFrames: int = 0
+    cpuLimit: Optional[float] = None
 
 
 class BotPlayer(Player):
@@ -195,6 +197,14 @@ class BotPlayer(Player):
             raise PlayerException(
                 "startupGraceFrames must be a non-negative integer"
             )
+
+        meta.cpuLimit = json_spec.get('cpuLimit')
+        if meta.cpuLimit is not None:
+            value = meta.cpuLimit
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value <= 0
+                    or round(value * 1_000_000_000) < 1):
+                raise PlayerException("cpuLimit must be a finite positive CPU number")
 
         return meta
 

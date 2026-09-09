@@ -138,7 +138,9 @@ parser.add_argument('--plot_realtime', action='store_true',
 parser.add_argument('--mem_limit', type=str, default=None,
                     help="Limit started containers to the given amount of memory.")
 parser.add_argument('--nano_cpus', type=int, default=None,
-                    help="Limit started containers to the given amount of cpu nanos.")
+                    help="Fallback CPU nanos for players whose bot.json omits cpuLimit.")
+parser.add_argument('--player_nano_cpus', type=int, nargs='+', default=None,
+                    help="Explicit CPU nanos per player in launch order, overriding bot.json; 0 is uncapped.")
 
 
 parser.add_argument('-v', "--version", action='store_true', dest='show_version',
