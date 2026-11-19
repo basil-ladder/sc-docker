@@ -46,6 +46,10 @@ Test to check install was successful:
 
 Now build the images required to run sc-docker. Enter the docker directory and run `build_images.sh`. Now you're setup to install scbw to manage the game containers.
 
+The build produces the legacy 32-bit image and a separate WoW64 image. Running
+bots whose `bot.json` sets `requiresCuda` also requires an NVIDIA driver and a
+Docker installation configured to expose NVIDIA GPUs to Linux containers.
+
 You can manually [download docker of specified version](https://download.docker.com) if it is missing from list of packages. For example
 
 - [Ubuntu 17.04 Zesty 64-bit `docker-ce` package](https://download.docker.com/linux/ubuntu/dists/zesty/pool/stable/amd64/docker-ce_17.09.0~ce-0~ubuntu_amd64.deb)
@@ -105,6 +109,10 @@ Enter yor credentials:
 Sometimes popup for entering your credentials could appear after VNC window, so don't miss it.
 
 Now build the images required to run sc-docker. Enter the docker directory and run `build_images.ps1`. Now you're setup to install scbw to manage the game containers.
+
+The build produces the legacy 32-bit image and a separate WoW64 image. CUDA
+bots additionally require Docker Desktop GPU support and a compatible NVIDIA
+driver on the host.
 
 ### Python & pip
 

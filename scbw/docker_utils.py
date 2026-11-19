@@ -59,6 +59,48 @@ except ImportError:
     DEVNULL = open(os.devnull, "wb")
 
 
+def docker_image_for_player(
+        player: Player,
+        docker_image: str,
+        docker_image_wow64: str
+) -> str:
+    if (isinstance(player, BotPlayer)
+            and player.meta.wineArchitecture == "win64"):
+        return docker_image_wow64
+    return docker_image
+
+
+def cuda_device_requests(player: Player) -> Optional[List[Any]]:
+    if not (isinstance(player, BotPlayer) and player.meta.requiresCuda):
+        return None
+    if not hasattr(docker.types, "DeviceRequest"):
+        raise DockerException(
+            "This Docker SDK is too old to launch CUDA bots; please upgrade docker-py."
+        )
+    return [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
+
+
+def startup_grace_frames(players: List[Player]) -> int:
+    return max([
+        player.meta.startupGraceFrames
+        for player in players
+        if isinstance(player, BotPlayer)
+    ] + [0])
+
+
+def player_nano_cpu_limits(players: List[Player], fallback: Optional[int],
+                           explicit: Optional[List[int]] = None) -> List[int]:
+    if explicit is not None:
+        if len(explicit) != len(players) or any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in explicit):
+            raise GameException("player_nano_cpus requires one non-negative integer per player")
+        return list(explicit)
+    return [round(player.meta.cpuLimit * 1_000_000_000)
+            if isinstance(player, BotPlayer) and player.meta.cpuLimit is not None
+            else (fallback or 0) for player in players]
+
+
 def ensure_docker_can_run() -> None:
     """
     :raises docker.errors.ContainerError
@@ -187,6 +229,8 @@ def launch_image(
 
         # docker
         docker_image: str,
+        docker_image_wow64: str,
+        max_no_command_frames: int,
         nano_cpus: Optional[int],
         mem_limit: Optional[str]
 ) -> None:
@@ -247,6 +291,9 @@ def launch_image(
         JAVA_DEBUG="0"
     )
 
+    if max_no_command_frames > 0:
+        env["TM_MAX_NO_COMMAND_FRAMES"] = max_no_command_frames
+
     if timeout is not None:
         env["PLAY_TIMEOUT"] = timeout
 
@@ -296,9 +343,14 @@ def launch_image(
             entrypoint_opts += ["--join"]
     command += entrypoint_opts
 
+    selected_docker_image = docker_image_for_player(
+        player, docker_image, docker_image_wow64
+    )
+    device_requests = cuda_device_requests(player)
+
     logger.debug(
         "\n"
-        f"docker_image={docker_image}\n"
+        f"docker_image={selected_docker_image}\n"
         f"command={pformat(command, indent=4)}\n"
         f"name={container_name}\n"
         f"detach={True}\n"
@@ -308,10 +360,10 @@ def launch_image(
         f"ports={ports}\n"
         f"nano_cpus={nano_cpus}\n"
         f"mem_limit={mem_limit}\n"
+        f"device_requests={device_requests}\n"
     )
 
-    container = docker_client.containers.run(
-        docker_image,
+    container_options = dict(
         command=command,
         name=container_name,
         detach=True,
@@ -322,6 +374,13 @@ def launch_image(
         nano_cpus=nano_cpus,
         mem_limit=mem_limit or None,
         pids_limit=PIDS_LIMIT
+    )
+    if device_requests is not None:
+        container_options["device_requests"] = device_requests
+
+    container = docker_client.containers.run(
+        selected_docker_image,
+        **container_options
     )
     if container:
         container_id = running_containers(container_name)
@@ -378,8 +437,13 @@ def launch_game(
         logger.info(f"removing existing game results of {game_name}")
         shutil.rmtree(f"{game_dir}/{game_name}")
 
+    image_params = dict(launch_params)
+    limits = image_params.pop("player_nano_cpus", None)
+    limits = player_nano_cpu_limits(players, image_params.get("nano_cpus"), limits)
     for nth_player, player in enumerate(players):
-        launch_image(player, nth_player=nth_player, num_players=len(players), **launch_params)
+        image_params["nano_cpus"] = limits[nth_player]
+        logger.info(f"CPU limit for {player}: {limits[nth_player]} nano-CPUs")
+        launch_image(player, nth_player=nth_player, num_players=len(players), **image_params)
 
     logger.debug("checking if game has launched properly...")
     time.sleep(1)

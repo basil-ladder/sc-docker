@@ -6,7 +6,7 @@ import sys
 import coloredlogs
 import docker
 from scbw.defaults import (
-    SC_BOT_DIR, SC_GAME_DIR, SC_MAP_DIR, SCBW_BASE_DIR, SC_IMAGE,
+    SC_BOT_DIR, SC_GAME_DIR, SC_MAP_DIR, SCBW_BASE_DIR, SC_IMAGE, SC_IMAGE_WOW64,
     SC_BWAPI_DATA_BWTA_DIR, SC_BWAPI_DATA_BWTA2_DIR, VERSION
 )
 from scbw.docker_utils import BASE_VNC_PORT, VNC_HOST
@@ -128,6 +128,9 @@ parser.add_argument('--docker_image', type=str, default=SC_IMAGE,
                     help="The name of the image that should \n"
                          "be used to launch the game.\n"
                          "This helps with local development.")
+parser.add_argument('--docker_image_wow64', type=str, default=SC_IMAGE_WOW64,
+                    help="The image used only for bots whose bot.json sets\n"
+                         "wineArchitecture to win64.")
 parser.add_argument('--plot_realtime', action='store_true',
                     help="Allow realtime plotting of frame information.\n"
                          "At the end of the game, this plot will be saved\n"
@@ -135,7 +138,9 @@ parser.add_argument('--plot_realtime', action='store_true',
 parser.add_argument('--mem_limit', type=str, default=None,
                     help="Limit started containers to the given amount of memory.")
 parser.add_argument('--nano_cpus', type=int, default=None,
-                    help="Limit started containers to the given amount of cpu nanos.")
+                    help="Fallback CPU nanos for players whose bot.json omits cpuLimit.")
+parser.add_argument('--player_nano_cpus', type=int, nargs='+', default=None,
+                    help="Explicit CPU nanos per player in launch order, overriding bot.json; 0 is uncapped.")
 
 
 parser.add_argument('-v', "--version", action='store_true', dest='show_version',
@@ -150,6 +155,18 @@ def _image_version_up_to_date():
 # todo: add support for multi-PC play.
 # We need to think about how to setup docker IPs,
 # maybe we will need to specify manually routing tables? :/
+
+def missing_data_directories(args):
+    configured = {
+        "bot": args.bot_dir,
+        "game": args.game_dir,
+        "map": args.map_dir,
+        "BWTA": args.bwapi_data_bwta_dir,
+        "BWTA2": args.bwapi_data_bwta2_dir,
+    }
+    return [f"{name}: {path}" for name, path in configured.items()
+            if not os.path.exists(path)]
+
 
 def main():
     args = parser.parse_args()
@@ -174,9 +191,13 @@ def main():
         except KeyboardInterrupt:
             sys.exit(1)
 
-    if not os.path.exists(SCBW_BASE_DIR):
-        parser.error(f'The data directory {SCBW_BASE_DIR} was not found. '
-                     f'Did you run "scbw.play --install"?')
+    missing_directories = missing_data_directories(args)
+    if missing_directories:
+        parser.error(
+            "The configured data directories were not found:\n"
+            + "\n".join(missing_directories)
+            + '\nDid you run "scbw.play --install" or pass explicit data directories?'
+        )
         # parser.error exits
 
     # bots are always required, but not if showing version :)

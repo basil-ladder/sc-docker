@@ -5,6 +5,7 @@ import enum
 import glob
 import json
 import logging
+import math
 import os.path
 import re
 
@@ -68,6 +69,10 @@ class BotJsonMeta:
     javaDebugPort: Optional[int] = None  # optionally allow attaching debugger
     javaOpts: Optional[str] = None # optional parameters to JVM
     port : Optional[str] = None # optionally publish a custom port to the host
+    wineArchitecture: str = "win32"
+    requiresCuda: bool = False
+    startupGraceFrames: int = 0
+    cpuLimit: Optional[float] = None
 
 
 class BotPlayer(Player):
@@ -170,6 +175,36 @@ class BotPlayer(Player):
         meta.javaDebugPort = json_spec['javaDebugPort'] if 'javaDebugPort' in json_spec else None
         meta.javaOpts = json_spec['javaOpts'] if 'javaOpts' in json_spec else None
         meta.port = json_spec['port'] if 'port' in json_spec else None
+
+        meta.wineArchitecture = json_spec.get('wineArchitecture', 'win32')
+        if meta.wineArchitecture not in ('win32', 'win64'):
+            raise PlayerException(
+                "wineArchitecture must be either 'win32' or 'win64'"
+            )
+
+        meta.requiresCuda = json_spec.get('requiresCuda', False)
+        if not isinstance(meta.requiresCuda, bool):
+            raise PlayerException("requiresCuda must be a boolean")
+        if meta.requiresCuda and meta.wineArchitecture != 'win64':
+            raise PlayerException(
+                "requiresCuda bots must set wineArchitecture to 'win64'"
+            )
+
+        meta.startupGraceFrames = json_spec.get('startupGraceFrames', 0)
+        if (isinstance(meta.startupGraceFrames, bool)
+                or not isinstance(meta.startupGraceFrames, int)
+                or meta.startupGraceFrames < 0):
+            raise PlayerException(
+                "startupGraceFrames must be a non-negative integer"
+            )
+
+        meta.cpuLimit = json_spec.get('cpuLimit')
+        if meta.cpuLimit is not None:
+            value = meta.cpuLimit
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value <= 0
+                    or round(value * 1_000_000_000) < 1):
+                raise PlayerException("cpuLimit must be a finite positive CPU number")
 
         return meta
 

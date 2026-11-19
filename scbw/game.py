@@ -10,9 +10,10 @@ from typing import List, Optional, Callable
 
 from scbw.bot_factory import retrieve_bots
 from scbw.bot_storage import LocalBotStorage, SscaitBotStorage
+from scbw.defaults import SC_IMAGE_WOW64
 from scbw.docker_utils import (
-    dockermachine_ip, launch_game,
-    remove_game_containers
+    dockermachine_ip, launch_game, startup_grace_frames,
+    remove_game_containers, player_nano_cpu_limits
 )
 from scbw.error import GameException, RealtimeOutedException
 from scbw.game_type import GameType
@@ -51,7 +52,9 @@ class GameArgs(Namespace):
     plot_realtime: bool
     read_overwrite: bool
     docker_image: str
+    docker_image_wow64: str
     nano_cpus: int
+    player_nano_cpus: Optional[List[int]]
     mem_limit: str
 
 
@@ -141,7 +144,10 @@ def run_game(
 
         # docker
         docker_image=args.docker_image,
+        docker_image_wow64=getattr(args, 'docker_image_wow64', SC_IMAGE_WOW64),
+        max_no_command_frames=startup_grace_frames(players),
         nano_cpus=args.nano_cpus,
+        player_nano_cpus=player_nano_cpu_limits(players, args.nano_cpus, getattr(args, 'player_nano_cpus', None)),
         mem_limit=args.mem_limit
     )
 
