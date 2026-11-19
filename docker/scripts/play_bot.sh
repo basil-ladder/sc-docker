@@ -24,6 +24,10 @@ cp -r "$BOT_DIR/read/." "$BOT_DATA_READ_DIR"
 cp -r "$BOT_DIR/supplementalRead/." "$BOT_DATA_READ_DIR" || true
 cp "$BOT_DIR/BWAPI.dll" "$BWAPI_DATA_DIR"
 cp -r "$BWAPI_DIR/bot/." "$BWAPI_DATA_DIR"
+# The shared BWTA cache is mounted read-only; links let the bot read it and still write analyses of new maps.
+mkdir -p "$BWAPI_DATA_BWTA_DIR" "$BWAPI_DATA_BWTA2_DIR"
+cp -rs /app/bwta-cache/BWTA/. "$BWAPI_DATA_BWTA_DIR"
+cp -rs /app/bwta-cache/BWTA2/. "$BWAPI_DATA_BWTA2_DIR"
 
 
 BOT_EXECUTABLE="$BWAPI_DATA_DIR/AI/$BOT_FILE"

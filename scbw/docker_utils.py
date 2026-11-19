@@ -1,5 +1,3 @@
-import distutils.dir_util
-import distutils.errors
 import logging
 import os
 import os.path
@@ -41,6 +39,9 @@ ERRORS_DIR = f"{SC_DIR}/Errors"
 BWAPI_DATA_DIR = f"{SC_DIR}/bwapi-data"
 BWAPI_DATA_BWTA_DIR = f"{BWAPI_DATA_DIR}/BWTA"
 BWAPI_DATA_BWTA2_DIR = f"{BWAPI_DATA_DIR}/BWTA2"
+# play_bot.sh links these into bwapi-data, so a bot can add to the cache but not change it for others.
+BWTA_CACHE_DIR = f"{APP_DIR}/bwta-cache/BWTA"
+BWTA2_CACHE_DIR = f"{APP_DIR}/bwta-cache/BWTA2"
 BOT_DATA_SAVE_DIR = f"{BWAPI_DATA_DIR}/save"
 BOT_DATA_READ_DIR = f"{BWAPI_DATA_DIR}/read"
 BOT_DATA_WRITE_DIR = f"{BWAPI_DATA_DIR}/write"
@@ -49,6 +50,8 @@ BOT_DATA_LOGS_DIR = f"{BWAPI_DATA_DIR}/logs"
 
 EXIT_CODE_REALTIME_OUTED = 2
 MAX_TIME_RUNNING_SINGLE_CONTAINER = 70
+# Stops fork bombs; Java bots and Wine need a few hundred threads.
+PIDS_LIMIT = 1024
 
 try:
     from subprocess import DEVNULL  # py3k
@@ -195,15 +198,21 @@ def launch_image(
 
     log_dir = f"{game_dir}/{game_name}/logs_{nth_player}"
     crashes_dir = f"{game_dir}/{game_name}/crashes_{nth_player}"
+    replays_dir = f"{game_dir}/{game_name}/replays_{nth_player}"
     os.makedirs(log_dir, mode=0o777, exist_ok=True)  # todo: proper mode
     os.makedirs(crashes_dir, mode=0o777, exist_ok=True)  # todo: proper mode
+    os.makedirs(replays_dir, mode=0o777, exist_ok=True)  # todo: proper mode
+    # Docker cannot create the mount point for replays_dir inside the read-only map dir.
+    os.makedirs(f"{map_dir}/replays", exist_ok=True)
 
+    # Maps and the BWTA caches are shared by all games, so bots must not be able to change them.
     volumes = {
         xoscmounts(log_dir): {"bind": LOG_DIR, "mode": "rw"},
-        xoscmounts(map_dir): {"bind": MAP_DIR, "mode": "rw"},
+        xoscmounts(map_dir): {"bind": MAP_DIR, "mode": "ro"},
+        xoscmounts(replays_dir): {"bind": f"{MAP_DIR}/replays", "mode": "rw"},
         xoscmounts(crashes_dir): {"bind": ERRORS_DIR, "mode": "rw"},
-        xoscmounts(bwapi_data_bwta_dir): {"bind": BWAPI_DATA_BWTA_DIR, "mode": "rw"},
-        xoscmounts(bwapi_data_bwta2_dir): {"bind": BWAPI_DATA_BWTA2_DIR, "mode": "rw"},
+        xoscmounts(bwapi_data_bwta_dir): {"bind": BWTA_CACHE_DIR, "mode": "ro"},
+        xoscmounts(bwapi_data_bwta2_dir): {"bind": BWTA2_CACHE_DIR, "mode": "ro"},
     }
 
     ports = {}
@@ -311,7 +320,8 @@ def launch_image(
         network=DOCKER_STARCRAFT_NETWORK,
         ports=ports,
         nano_cpus=nano_cpus,
-        mem_limit=mem_limit or None
+        mem_limit=mem_limit or None,
+        pids_limit=PIDS_LIMIT
     )
     if container:
         container_id = running_containers(container_name)
@@ -335,7 +345,8 @@ def remove_game_containers(name_filter: str) -> None:
     """
     for container in docker_client.containers.list(filters={"name": name_filter}, all=True):
         container.stop()
-        container.remove()
+        # v=True: the image declares the BWTA folders as volumes, which would pile up otherwise.
+        container.remove(v=True)
 
 
 def container_exit_code(container_id: str) -> Optional[int]:
@@ -421,7 +432,10 @@ def launch_game(
         for nth_player, player in enumerate(players):
             if isinstance(player, BotPlayer):
                 logger.debug(f"overwriting files for {player}")
-                distutils.dir_util.copy_tree(
+                # Merges into read like the old distutils copy, but skips links: they could point at any host file.
+                shutil.copytree(
                     f"{game_dir}/{game_name}/write_{nth_player}",
-                    player.read_dir
+                    player.read_dir,
+                    ignore=lambda folder, names: [n for n in names if os.path.islink(os.path.join(folder, n))],
+                    dirs_exist_ok=True
                 )
